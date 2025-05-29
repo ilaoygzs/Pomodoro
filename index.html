@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>屏幕常亮与番茄时钟</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-image: url("https://bing.img.run/1920x1080.php");
+            background-size: cover;
+            background-position: center center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+            color: #333;
+            position: relative;
+        }
+
+        body::before { /* Optional: very light overlay for overall aesthetic */
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.05); 
+            z-index: -1;
+        }
+
+        .content-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 780px;
+        }
+
+        .settings-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: rgba(255, 255, 255, 0.7); /* ~30% transparent */
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            padding: 12px 18px;
+            width: 100%;
+            margin-bottom: 25px;
+            box-sizing: border-box;
+        }
+
+        .settings-container span {
+            font-size: 15px;
+            color: #333;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 48px;
+            height: 26px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 26px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+
+        input:checked + .slider {
+            background-color: #4CAF50;
+        }
+
+        input:focus + .slider {
+            box-shadow: 0 0 1px #4CAF50;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(22px);
+        }
+
+        .main-cards-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 20px;
+            width: 100%;
+        }
+
+        .card {
+            background-color: rgba(255, 255, 255, 0.7); /* ~30% transparent */
+            border-radius: 14px;
+            padding: 20px;
+            text-align: center;
+            flex: 1;
+            min-width: 0;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.12);
+            position: relative;
+        }
+
+        .clock-container {
+             height: 280px;
+        }
+        
+        #analogClock {
+            width: 100%;
+            height: 100%;
+            max-width: 220px;
+            max-height: 220px;
+            display: block;
+            margin: 10px auto 0;
+        }
+        
+        .expand-icon {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            font-size: 16px;
+            color: #999;
+            cursor: pointer;
+        }
+
+        .pomodoro-container {
+            min-height: 280px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-around;
+        }
+
+        .pomodoro-container h2 {
+            font-size: 15px;
+            font-weight: 500;
+            color: #555;
+            margin-top: 0;
+            margin-bottom: 10px;
+        }
+
+        .duration-settings {
+            margin-bottom: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+        .duration-settings label {
+            font-size: 13px;
+            color: #666;
+        }
+        .duration-settings select, .duration-settings input[type="number"] {
+            padding: 6px 8px;
+            border-radius: 6px;
+            border: 1px solid rgba(221, 221, 221, 0.7);
+            background-color: rgba(255, 255, 255, 0.75); /* Controls slightly more opaque for readability */
+            font-size: 14px;
+            text-align: center;
+            width: 120px;
+            color: #333;
+        }
+         .duration-settings input[type="number"] {
+            width: 80px;
+         }
+        .custom-duration-input-container {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .custom-duration-input-container span {
+            font-size: 13px;
+            color: #666;
+        }
+
+
+        #timerDisplay {
+            font-size: 64px;
+            font-weight: 500;
+            color: #000;
+            margin-bottom: 18px;
+            line-height: 1;
+        }
+        
+        .pomodoro-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+        }
+
+        .pomodoro-button {
+            border: none;
+            padding: 10px 20px;
+            font-size: 15px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: background-color 0.3s, color 0.3s, opacity 0.3s;
+            min-width: 90px;
+            font-weight: 500;
+        }
+        .pomodoro-button:disabled {
+            opacity: 0.6; /* Slightly more transparent when disabled */
+            cursor: not-allowed;
+        }
+        .duration-settings select:disabled, .duration-settings input[type="number"]:disabled {
+            background-color: rgba(233, 233, 233, 0.6);
+            color: rgba(100,100,100, 0.8);
+            cursor: not-allowed;
+            opacity: 0.8;
+        }
+
+        #startPauseButton {
+            background-color: rgba(40, 40, 40, 0.7); /* ~30% transparent dark button */
+            color: white;
+        }
+
+        #startPauseButton:hover:not(:disabled) {
+            background-color: rgba(68, 68, 68, 0.75); /* Slightly less transparent on hover */
+        }
+
+        #resetButton {
+            background-color: rgba(240, 240, 240, 0.7); /* ~30% transparent light button */
+            color: #333;
+            border: 1px solid rgba(200, 200, 200, 0.7); /* Border also transparent */
+        }
+
+        #resetButton:hover:not(:disabled) {
+            background-color: rgba(225, 225, 225, 0.75); /* Slightly less transparent on hover */
+        }
+
+        .footer {
+            margin-top: 30px;
+            font-size: 13px;
+            color: #eee;
+            text-shadow: 0 0 3px rgba(0,0,0,0.5);
+            text-align: center;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 700px) {
+            .main-cards-container {
+                flex-direction: column;
+                align-items: center;
+            }
+            .card {
+                width: 100%;
+                max-width: 400px;
+                margin-bottom: 20px;
+            }
+            .card:last-child {
+                margin-bottom: 0;
+            }
+            .clock-container, .pomodoro-container {
+                 height: auto;
+                 min-height: 280px;
+            }
+            #analogClock {
+                 max-width: 200px;
+                 max-height: 200px;
+            }
+            #timerDisplay {
+                font-size: 56px;
+            }
+        }
+         @media (max-width: 480px) {
+            body {
+                padding: 15px;
+            }
+            .settings-container {
+                padding: 10px 15px;
+                margin-bottom: 20px;
+            }
+            .settings-container span {
+                font-size: 14px;
+            }
+             .card {
+                padding: 15px;
+                border-radius: 12px;
+             }
+            .clock-container, .pomodoro-container {
+                 min-height: 260px;
+            }
+            #analogClock {
+                 max-width: 160px;
+                 max-height: 160px;
+                 margin-top: 5px;
+            }
+            #timerDisplay {
+                font-size: 50px;
+                margin-bottom: 15px;
+            }
+            .duration-settings select, .duration-settings input[type="number"] {
+                font-size: 13px;
+            }
+            .pomodoro-button {
+                padding: 8px 18px;
+                font-size: 14px;
+                min-width: 80px;
+            }
+            .footer {
+                font-size: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="content-wrapper">
+        <div class="settings-container">
+            <span>Keep Screen On</span>
+            <label class="switch">
+                <input type="checkbox" id="keepScreenOnToggle">
+                <span class="slider"></span>
+            </label>
+        </div>
+
+        <div class="main-cards-container">
+            <div class="card clock-container">
+                <canvas id="analogClock"></canvas>
+                <span class="expand-icon" title="Expand">&#x2197;&#xFE0E;</span>
+            </div>
+
+            <div class="card pomodoro-container">
+                <h2>番茄时钟</h2>
+                
+                <div class="duration-settings">
+                    <label for="durationSelect">选择时长:</label>
+                    <select id="durationSelect">
+                        <option value="5">5 分钟</option>
+                        <option value="10">10 分钟</option>
+                        <option value="15">15 分钟</option>
+                        <option value="25" selected>25 分钟</option>
+                        <option value="30">30 分钟</option>
+                        <option value="custom">自定义</option>
+                    </select>
+                    <div id="customDurationContainer" style="display: none;" class="custom-duration-input-container">
+                        <input type="number" id="customDurationInput" min="1" value="25">
+                        <span>分钟</span>
+                    </div>
+                </div>
+
+                <div id="timerDisplay">25:00</div>
+                <div class="pomodoro-buttons">
+                    <button id="startPauseButton" class="pomodoro-button">Start</button>
+                    <button id="resetButton" class="pomodoro-button" style="display: none;">Reset</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>© 老Y工作室</p>
+        </div>
+    </div>
+
+    <script>
+        // --- Screen Wake Lock ---
+        const keepScreenOnToggle = document.getElementById('keepScreenOnToggle');
+        let wakeLock = null;
+        async function requestWakeLock() {
+            if (!navigator.wakeLock) {
+                console.warn('Screen Wake Lock API not supported.');
+                if(keepScreenOnToggle.checked) alert('此浏览器不支持屏幕常亮功能。');
+                keepScreenOnToggle.checked = false;
+                return;
+            }
+            try {
+                wakeLock = await navigator.wakeLock.request('screen');
+                wakeLock.addEventListener('release', () => {
+                    // Wake lock released
+                });
+            } catch (err) {
+                console.error(`Wake Lock Error: ${err.name}, ${err.message}`);
+                if(keepScreenOnToggle.checked) alert('激活屏幕常亮失败: ' + err.message);
+                keepScreenOnToggle.checked = false; 
+            }
+        }
+        async function releaseWakeLock() {
+            if (wakeLock) {
+                await wakeLock.release();
+                wakeLock = null;
+            }
+        }
+        keepScreenOnToggle.addEventListener('change', async () => {
+            if (keepScreenOnToggle.checked) {
+                await requestWakeLock();
+            } else {
+                await releaseWakeLock();
+            }
+        });
+        document.addEventListener('visibilitychange', async () => {
+            if (document.visibilityState === 'visible' && keepScreenOnToggle.checked && !wakeLock) {
+                await requestWakeLock();
+            }
+        });
+
+
+        // --- Analog Clock ---
+        const canvas = document.getElementById('analogClock');
+        const ctx = canvas.getContext('2d');
+        let clockRadius; 
+
+        function resizeClock() {
+            const container = canvas.parentElement;
+            canvas.style.width = '100%';
+            canvas.style.height = '100%';
+            const computedStyle = getComputedStyle(canvas);
+            const actualWidth = parseFloat(computedStyle.width);
+            const actualHeight = parseFloat(computedStyle.height);
+            const size = Math.min(actualWidth, actualHeight);
+            canvas.width = size; 
+            canvas.height = size;
+            clockRadius = canvas.height / 2; 
+            ctx.translate(clockRadius, clockRadius); 
+            clockRadius = clockRadius * 0.90; 
+            drawClock();
+        }
+        
+        function drawClock() {
+            ctx.clearRect(-canvas.width / 2, -canvas.height / 2, canvas.width, canvas.height);
+            drawFace(ctx, clockRadius);
+            drawTicks(ctx, clockRadius);
+            drawTime(ctx, clockRadius);
+        }
+
+        function drawFace(ctx, radius) {
+            ctx.beginPath();
+            ctx.arc(0, 0, radius * 0.035, 0, 2 * Math.PI);
+            ctx.fillStyle = '#333';
+            ctx.fill();
+        }
+
+        function drawTicks(ctx, radius) {
+            for (let i = 0; i < 60; i++) {
+                const angle = (i / 60) * 2 * Math.PI;
+                const isHourTick = (i % 5 === 0);
+                const tickOuterPosition = radius * (isHourTick ? 0.92 : 0.94);
+                const hourTickLength = radius * 0.12;
+                const minuteTickLength = radius * 0.07;
+                const tickLength = isHourTick ? hourTickLength : minuteTickLength;
+                const innerPosition = tickOuterPosition - tickLength;
+                ctx.save();
+                ctx.rotate(angle);
+                ctx.beginPath();
+                ctx.lineWidth = isHourTick ? radius * 0.035 : radius * 0.02;
+                ctx.strokeStyle = '#555';
+                ctx.moveTo(0, -innerPosition);
+                ctx.lineTo(0, -tickOuterPosition);
+                ctx.stroke();
+                ctx.restore();
+            }
+        }
+
+        function drawTime(ctx, radius) {
+            const now = new Date();
+            let hour = now.getHours();
+            let minute = now.getMinutes();
+            let second = now.getSeconds();
+            hour = hour % 12;
+            hour = (hour * Math.PI / 6) + (minute * Math.PI / (6 * 60)) + (second * Math.PI / (360 * 60));
+            drawHand(ctx, hour, radius * 0.5, radius * 0.07, '#222');
+            minute = (minute * Math.PI / 30) + (second * Math.PI / (30 * 60));
+            drawHand(ctx, minute, radius * 0.75, radius * 0.05, '#222');
+            second = (second * Math.PI / 30);
+            drawHand(ctx, second, radius * 0.85, radius * 0.025, 'red');
+        }
+
+        function drawHand(ctx, pos, length, width, color) {
+            ctx.beginPath();
+            ctx.lineWidth = width;
+            ctx.lineCap = "round";
+            ctx.strokeStyle = color;
+            ctx.moveTo(0, 0);
+            ctx.rotate(pos);
+            ctx.lineTo(0, -length);
+            ctx.stroke();
+            ctx.rotate(-pos);
+        }
+        
+        let resizeTimeout;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimeout);
+            ctx.setTransform(1, 0, 0, 1, 0, 0); 
+            resizeTimeout = setTimeout(resizeClock, 100);
+        });
+        
+        if (document.readyState === 'complete') {
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            resizeClock();
+        } else {
+            window.addEventListener('load', () => {
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                resizeClock();
+            });
+        }
+        setInterval(drawClock, 1000);
+
+        // --- Pomodoro Timer ---
+        const timerDisplay = document.getElementById('timerDisplay');
+        const startPauseButton = document.getElementById('startPauseButton');
+        const resetButton = document.getElementById('resetButton');
+        const durationSelect = document.getElementById('durationSelect');
+        const customDurationContainer = document.getElementById('customDurationContainer');
+        const customDurationInput = document.getElementById('customDurationInput');
+
+        let currentSetDurationSeconds = 25 * 60;
+        let timeLeft = currentSetDurationSeconds;
+        let timerInterval = null;
+        let isTimerRunning = false;
+
+        function formatTime(seconds) {
+            const minutes = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+        function updateTimerDisplay() {
+            timerDisplay.textContent = formatTime(timeLeft);
+            if (isTimerRunning || (timerInterval !== null && timeLeft < currentSetDurationSeconds) || (timerInterval === null && timeLeft < currentSetDurationSeconds && timeLeft !== 0 && timeLeft !== currentSetDurationSeconds) ) {
+                 document.title = `${formatTime(timeLeft)} - 番茄时钟`;
+            } else {
+                 document.title = "番茄时钟";
+            }
+        }
+        function getSelectedDuration() {
+            let durationMinutes;
+            if (durationSelect.value === 'custom') {
+                durationMinutes = parseInt(customDurationInput.value, 10);
+                if (isNaN(durationMinutes) || durationMinutes < 1) {
+                    alert("自定义时长请输入一个大于0的数字。");
+                    durationMinutes = 1; 
+                    customDurationInput.value = 1;
+                }
+            } else {
+                durationMinutes = parseInt(durationSelect.value, 10);
+            }
+            return durationMinutes * 60;
+        }
+        function setInitialTimerState() {
+            currentSetDurationSeconds = getSelectedDuration();
+            timeLeft = currentSetDurationSeconds;
+            updateTimerDisplay();
+        }
+        function toggleDurationControls(enable) {
+            durationSelect.disabled = !enable;
+            customDurationInput.disabled = !enable;
+        }
+        durationSelect.addEventListener('change', () => {
+            if (durationSelect.value === 'custom') {
+                customDurationContainer.style.display = 'flex';
+                 if (!isTimerRunning && timerInterval === null) customDurationInput.focus();
+            } else {
+                customDurationContainer.style.display = 'none';
+            }
+            if (!isTimerRunning && timerInterval === null) {
+                setInitialTimerState();
+            }
+        });
+        customDurationInput.addEventListener('change', () => {
+            if (!isTimerRunning && timerInterval === null) {
+                 setInitialTimerState();
+            }
+        });
+        customDurationInput.addEventListener('input', () => { 
+            if (!isTimerRunning && timerInterval === null) {
+                 setInitialTimerState();
+            }
+        });
+        function runTimer() {
+            isTimerRunning = true;
+            startPauseButton.textContent = 'Pause';
+            resetButton.style.display = 'inline-block';
+            toggleDurationControls(false);
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                updateTimerDisplay();
+                if (timeLeft < 0) {
+                    clearInterval(timerInterval);
+                    timerInterval = null;
+                    isTimerRunning = false;
+                    alert('番茄时间到！Time is up!');
+                    setInitialTimerState();
+                    startPauseButton.textContent = 'Start';
+                    resetButton.style.display = 'none';
+                    toggleDurationControls(true);
+                    // Optional: Play a sound
+                    // var audio = new Audio('notification.mp3'); // Add an audio file
+                    // audio.play();
+                }
+            }, 1000);
+        }
+        function pauseTimer() {
+            clearInterval(timerInterval);
+            isTimerRunning = false;
+            startPauseButton.textContent = 'Resume';
+        }
+        function resetTimerLogic() {
+            clearInterval(timerInterval);
+            timerInterval = null;
+            isTimerRunning = false;
+            setInitialTimerState();
+            startPauseButton.textContent = 'Start';
+            resetButton.style.display = 'none';
+            toggleDurationControls(true);
+        }
+        startPauseButton.addEventListener('click', () => {
+            if (isTimerRunning) {
+                pauseTimer();
+            } else {
+                if (timerInterval === null) { 
+                    currentSetDurationSeconds = getSelectedDuration();
+                    timeLeft = currentSetDurationSeconds;
+                }
+                if (timeLeft <= 0 && timerInterval === null) { 
+                    timeLeft = currentSetDurationSeconds;
+                }
+                updateTimerDisplay(); 
+                runTimer();
+            }
+        });
+        resetButton.addEventListener('click', resetTimerLogic);
+        setInitialTimerState();
+
+    </script>
+</body>
+</html>
