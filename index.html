@@ -7,7 +7,8 @@
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-image: url("https://bing.img.run/1920x1080.php");
+            /* Initial background - can be a color or a generic placeholder */
+            background-color: #e0e0e0; /* Light grey fallback */
             background-size: cover;
             background-position: center center;
             background-repeat: no-repeat;
@@ -25,14 +26,14 @@
             position: relative;
         }
 
-        body::before { /* Optional: very light overlay for overall aesthetic */
+        body::before {
             content: "";
             position: absolute;
             top: 0;
             left: 0;
             right: 0;
             bottom: 0;
-            background-color: rgba(0, 0, 0, 0.05); 
+            background-color: rgba(0, 0, 0, 0.15); /* Slightly darker overlay for better contrast with transparent elements */
             z-index: -1;
         }
 
@@ -48,7 +49,7 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            background-color: rgba(255, 255, 255, 0.7); /* ~30% transparent */
+            background-color: rgba(255, 255, 255, 0.7);
             border-radius: 10px;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
             padding: 12px 18px;
@@ -121,7 +122,7 @@
         }
 
         .card {
-            background-color: rgba(255, 255, 255, 0.7); /* ~30% transparent */
+            background-color: rgba(255, 255, 255, 0.7);
             border-radius: 14px;
             padding: 20px;
             text-align: center;
@@ -142,6 +143,15 @@
             max-height: 220px;
             display: block;
             margin: 10px auto 0;
+        }
+        
+        .expand-icon {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            font-size: 16px;
+            color: #999;
+            cursor: pointer;
         }
 
         .pomodoro-container {
@@ -174,7 +184,7 @@
             padding: 6px 8px;
             border-radius: 6px;
             border: 1px solid rgba(221, 221, 221, 0.7);
-            background-color: rgba(255, 255, 255, 0.75); /* Controls slightly more opaque for readability */
+            background-color: rgba(255, 255, 255, 0.75);
             font-size: 14px;
             text-align: center;
             width: 120px;
@@ -219,7 +229,7 @@
             font-weight: 500;
         }
         .pomodoro-button:disabled {
-            opacity: 0.6; /* Slightly more transparent when disabled */
+            opacity: 0.7;
             cursor: not-allowed;
         }
         .duration-settings select:disabled, .duration-settings input[type="number"]:disabled {
@@ -229,30 +239,31 @@
             opacity: 0.8;
         }
 
+
         #startPauseButton {
-            background-color: rgba(40, 40, 40, 0.7); /* ~30% transparent dark button */
+            background-color: rgba(40, 40, 40, 0.75);
             color: white;
         }
 
         #startPauseButton:hover:not(:disabled) {
-            background-color: rgba(68, 68, 68, 0.75); /* Slightly less transparent on hover */
+            background-color: rgba(68, 68, 68, 0.8);
         }
 
         #resetButton {
-            background-color: rgba(240, 240, 240, 0.7); /* ~30% transparent light button */
+            background-color: rgba(248, 248, 248, 0.7);
             color: #333;
-            border: 1px solid rgba(200, 200, 200, 0.7); /* Border also transparent */
+            border: 1px solid rgba(224, 224, 224, 0.7);
         }
 
         #resetButton:hover:not(:disabled) {
-            background-color: rgba(225, 225, 225, 0.75); /* Slightly less transparent on hover */
+            background-color: rgba(239, 239, 239, 0.75);
         }
 
         .footer {
             margin-top: 30px;
             font-size: 13px;
             color: #eee;
-            text-shadow: 0 0 3px rgba(0,0,0,0.5);
+            text-shadow: 0 0 4px rgba(0,0,0,0.6);
             text-align: center;
         }
 
@@ -336,6 +347,7 @@
         <div class="main-cards-container">
             <div class="card clock-container">
                 <canvas id="analogClock"></canvas>
+                <span class="expand-icon" title="Expand">&#x2197;&#xFE0E;</span>
             </div>
 
             <div class="card pomodoro-container">
@@ -371,6 +383,14 @@
     </div>
 
     <script>
+        // --- Set Random Background Image ---
+        document.addEventListener('DOMContentLoaded', function() {
+            const imageCount = 5; // We have 1.jpg to 5.jpg
+            const randomIndex = Math.floor(Math.random() * imageCount) + 1; // Generates 1, 2, 3, 4, or 5
+            const imagePath = `pic/${randomIndex}.jpg`;
+            document.body.style.backgroundImage = `url('${imagePath}')`;
+        });
+
         // --- Screen Wake Lock ---
         const keepScreenOnToggle = document.getElementById('keepScreenOnToggle');
         let wakeLock = null;
@@ -384,8 +404,14 @@
             try {
                 wakeLock = await navigator.wakeLock.request('screen');
                 wakeLock.addEventListener('release', () => {
-                    // Wake lock released
+                    // If wake lock is released by system, and toggle is still on,
+                    // and page is visible, we might want to re-acquire it.
+                    if (keepScreenOnToggle.checked && document.visibilityState === 'visible') {
+                        // console.log('Wake Lock released, attempting to re-acquire.');
+                        // requestWakeLock(); // Be cautious with automatic re-requests
+                    }
                 });
+                // console.log('Screen Wake Lock is active.');
             } catch (err) {
                 console.error(`Wake Lock Error: ${err.name}, ${err.message}`);
                 if(keepScreenOnToggle.checked) alert('激活屏幕常亮失败: ' + err.message);
@@ -396,6 +422,7 @@
             if (wakeLock) {
                 await wakeLock.release();
                 wakeLock = null;
+                // console.log('Screen Wake Lock released by user.');
             }
         }
         keepScreenOnToggle.addEventListener('change', async () => {
@@ -406,7 +433,9 @@
             }
         });
         document.addEventListener('visibilitychange', async () => {
+            // When the page becomes visible again, if the toggle is on and we don't have a lock, try to get it.
             if (document.visibilityState === 'visible' && keepScreenOnToggle.checked && !wakeLock) {
+                // console.log('Page visible, re-acquiring wake lock.');
                 await requestWakeLock();
             }
         });
@@ -415,21 +444,26 @@
         // --- Analog Clock ---
         const canvas = document.getElementById('analogClock');
         const ctx = canvas.getContext('2d');
-        let clockRadius; 
+        let clockRadius;
 
         function resizeClock() {
             const container = canvas.parentElement;
             canvas.style.width = '100%';
             canvas.style.height = '100%';
+
             const computedStyle = getComputedStyle(canvas);
             const actualWidth = parseFloat(computedStyle.width);
             const actualHeight = parseFloat(computedStyle.height);
+            
             const size = Math.min(actualWidth, actualHeight);
-            canvas.width = size; 
+            
+            canvas.width = size;
             canvas.height = size;
+            
             clockRadius = canvas.height / 2; 
-            ctx.translate(clockRadius, clockRadius); 
-            clockRadius = clockRadius * 0.90; 
+            ctx.translate(clockRadius, clockRadius);
+            clockRadius = clockRadius * 0.90;
+            
             drawClock();
         }
         
@@ -451,19 +485,24 @@
             for (let i = 0; i < 60; i++) {
                 const angle = (i / 60) * 2 * Math.PI;
                 const isHourTick = (i % 5 === 0);
+
                 const tickOuterPosition = radius * (isHourTick ? 0.92 : 0.94);
                 const hourTickLength = radius * 0.12;
                 const minuteTickLength = radius * 0.07;
                 const tickLength = isHourTick ? hourTickLength : minuteTickLength;
                 const innerPosition = tickOuterPosition - tickLength;
+
                 ctx.save();
                 ctx.rotate(angle);
+
                 ctx.beginPath();
                 ctx.lineWidth = isHourTick ? radius * 0.035 : radius * 0.02;
                 ctx.strokeStyle = '#555';
+
                 ctx.moveTo(0, -innerPosition);
                 ctx.lineTo(0, -tickOuterPosition);
                 ctx.stroke();
+
                 ctx.restore();
             }
         }
@@ -473,11 +512,16 @@
             let hour = now.getHours();
             let minute = now.getMinutes();
             let second = now.getSeconds();
+
             hour = hour % 12;
-            hour = (hour * Math.PI / 6) + (minute * Math.PI / (6 * 60)) + (second * Math.PI / (360 * 60));
+            hour = (hour * Math.PI / 6) + 
+                   (minute * Math.PI / (6 * 60)) + 
+                   (second * Math.PI / (360 * 60));
             drawHand(ctx, hour, radius * 0.5, radius * 0.07, '#222');
+            
             minute = (minute * Math.PI / 30) + (second * Math.PI / (30 * 60));
             drawHand(ctx, minute, radius * 0.75, radius * 0.05, '#222');
+            
             second = (second * Math.PI / 30);
             drawHand(ctx, second, radius * 0.85, radius * 0.025, 'red');
         }
@@ -501,16 +545,24 @@
             resizeTimeout = setTimeout(resizeClock, 100);
         });
         
-        if (document.readyState === 'complete') {
-            ctx.setTransform(1, 0, 0, 1, 0, 0);
-            resizeClock();
-        } else {
-            window.addEventListener('load', () => {
+        function initializeClock() {
+             // Ensure canvas context exists and is ready
+            if (canvas && canvas.getContext) {
                 ctx.setTransform(1, 0, 0, 1, 0, 0);
                 resizeClock();
-            });
+            } else {
+                // Fallback or error handling if canvas isn't ready
+                console.error("Canvas not ready for clock initialization.");
+            }
+        }
+
+        if (document.readyState === 'complete') {
+            initializeClock();
+        } else {
+            window.addEventListener('load', initializeClock);
         }
         setInterval(drawClock, 1000);
+
 
         // --- Pomodoro Timer ---
         const timerDisplay = document.getElementById('timerDisplay');
@@ -532,7 +584,8 @@
         }
         function updateTimerDisplay() {
             timerDisplay.textContent = formatTime(timeLeft);
-            if (isTimerRunning || (timerInterval !== null && timeLeft < currentSetDurationSeconds) || (timerInterval === null && timeLeft < currentSetDurationSeconds && timeLeft !== 0 && timeLeft !== currentSetDurationSeconds) ) {
+            // Update title logic: if timer is active (running or paused with time elapsed)
+            if (isTimerRunning || (timerInterval !== null && timeLeft < currentSetDurationSeconds) || (timerInterval === null && timeLeft < currentSetDurationSeconds && timeLeft !== currentSetDurationSeconds) ) {
                  document.title = `${formatTime(timeLeft)} - 番茄时钟`;
             } else {
                  document.title = "番茄时钟";
@@ -568,18 +621,18 @@
             } else {
                 customDurationContainer.style.display = 'none';
             }
-            if (!isTimerRunning && timerInterval === null) {
+            if (!isTimerRunning && timerInterval === null) { // Only update if timer is not running or paused
                 setInitialTimerState();
             }
         });
-        customDurationInput.addEventListener('change', () => {
+        customDurationInput.addEventListener('change', () => { // When focus is lost or enter is pressed
             if (!isTimerRunning && timerInterval === null) {
                  setInitialTimerState();
             }
         });
-        customDurationInput.addEventListener('input', () => { 
+        customDurationInput.addEventListener('input', () => { // Live update for typing, if desired
             if (!isTimerRunning && timerInterval === null) {
-                 setInitialTimerState();
+                 // setInitialTimerState(); // This might be too frequent, consider if needed
             }
         });
         function runTimer() {
@@ -590,52 +643,53 @@
             timerInterval = setInterval(() => {
                 timeLeft--;
                 updateTimerDisplay();
-                if (timeLeft < 0) {
+                if (timeLeft < 0) { // Timer ends when timeLeft goes below 0
                     clearInterval(timerInterval);
                     timerInterval = null;
                     isTimerRunning = false;
                     alert('番茄时间到！Time is up!');
-                    setInitialTimerState();
+                    setInitialTimerState(); // Reset to current selected duration
                     startPauseButton.textContent = 'Start';
                     resetButton.style.display = 'none';
                     toggleDurationControls(true);
-                    // Optional: Play a sound
-                    // var audio = new Audio('notification.mp3'); // Add an audio file
-                    // audio.play();
                 }
             }, 1000);
         }
         function pauseTimer() {
             clearInterval(timerInterval);
-            isTimerRunning = false;
+            // isTimerRunning remains true logically, timerInterval is used to check if it's paused
+            isTimerRunning = false; // Set to false as it's not actively counting down
             startPauseButton.textContent = 'Resume';
         }
         function resetTimerLogic() {
             clearInterval(timerInterval);
             timerInterval = null;
             isTimerRunning = false;
-            setInitialTimerState();
+            setInitialTimerState(); // Reset to current selected duration
             startPauseButton.textContent = 'Start';
             resetButton.style.display = 'none';
             toggleDurationControls(true);
         }
         startPauseButton.addEventListener('click', () => {
-            if (isTimerRunning) {
+            if (isTimerRunning) { // If actively running, then pause
                 pauseTimer();
-            } else {
-                if (timerInterval === null) { 
-                    currentSetDurationSeconds = getSelectedDuration();
+            } else { // If not actively running (could be initial start or resumed)
+                if (timerInterval === null) { // It's a fresh start or after reset
+                    currentSetDurationSeconds = getSelectedDuration(); // Get latest duration setting
                     timeLeft = currentSetDurationSeconds;
                 }
-                if (timeLeft <= 0 && timerInterval === null) { 
+                // If timeLeft is 0 or less after a previous run, ensure it resets to currentSetDurationSeconds
+                if (timeLeft <= 0 && timerInterval === null) {
                     timeLeft = currentSetDurationSeconds;
                 }
-                updateTimerDisplay(); 
-                runTimer();
+                updateTimerDisplay(); // Update display before starting in case duration changed while paused/stopped
+                runTimer(); // This will set isTimerRunning to true
             }
         });
         resetButton.addEventListener('click', resetTimerLogic);
-        setInitialTimerState();
+        
+        // Initial setup for Pomodoro Timer
+        setInitialTimerState(); // Initialize timer display with default/selected duration
 
     </script>
 </body>
